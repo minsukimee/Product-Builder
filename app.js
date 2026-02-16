@@ -43,13 +43,13 @@ const FEE_RATE = 0.0015;
 const AD_RESCUE_AMOUNT = 2000;
 const AD_COOLDOWN = 60 * 1000;
 const AD_DAILY_LIMIT = 10;
-const CHART_UPDATE_INTERVAL = 2;
+const CANDLE_INTERVAL = 15 * 1000; // 15 seconds
 
 // --- Game State ---
 let gameState = {};
 let roundState = {};
 let chart;
-let chartUpdateCounter = 0;
+let candleState = null;
 let gameLoopInterval;
 
 const EVENTS = {
@@ -91,9 +91,13 @@ function saveGameState() {
 
 function startNewRound() {
     if (gameState.accountBalance <= 0 && gameState.bankruptCount > 0) {
-        handleLiquidation(true); // Stay on bankrupt screen if account is empty
+        handleLiquidation(true);
         return;
     }
+
+    // Explicitly hide overlay and enable controls
+    dom.bankruptOverlay.classList.add('hidden');
+    [dom.buyBtn, dom.sellBtn, dom.panicSellBtn].forEach(btn => btn.disabled = false);
 
     roundState = {
         isActive: true,
@@ -104,7 +108,7 @@ function startNewRound() {
         cash: gameState.accountBalance,
         positionSize: 0,
         entryPrice: 0,
-        leverage: roundState.leverage || 1, // Persist leverage
+        leverage: roundState.leverage || 1,
         startPrice: 100,
         currentPrice: 100,
         minPrice: 50,
@@ -114,9 +118,9 @@ function startNewRound() {
     };
     gameState.roundNumber = roundState.roundNumber;
     
-    dom.bankruptOverlay.classList.add('hidden');
-    chart.data.labels = [];
+    candleState = null;
     chart.data.datasets[0].data = [];
+    chart.update();
     
     logEvent("New round started! Good luck!", "system");
     updateAllUI();
@@ -135,15 +139,13 @@ function endRound() {
     }
     if (gameState.accountBalance <= 0) {
         handleLiquidation(true);
+        return; 
     }
     
     saveGameState();
-    
     logEvent(`Round ended. Final cash: $${roundState.cash.toFixed(2)}. Next round starts soon.`, "system");
     
-    if (!roundState.isLiquidated) {
-        setTimeout(startNewRound, 2000);
-    }
+    setTimeout(startNewRound, 2000);
 }
 
 function tick() {
@@ -161,11 +163,41 @@ function tick() {
     
     updateAllUI();
     
-    chartUpdateCounter++;
-    if (chartUpdateCounter >= CHART_UPDATE_INTERVAL) {
-        updateChart(elapsed, roundState.currentPrice);
-        chartUpdateCounter = 0;
+    // Candlestick aggregation
+    const candleTime = Math.floor(elapsed / CANDLE_INTERVAL) * CANDLE_INTERVAL;
+    if (!candleState || candleTime !== candleState.t) {
+        if (candleState) {
+            chart.data.datasets[0].data.push({x: candleState.t + roundState.startTime, o: candleState.o, h: candleState.h, l: candleState.l, c: candleState.c});
+        }
+        candleState = {
+            t: candleTime,
+            o: roundState.currentPrice,
+            h: roundState.currentPrice,
+            l: roundState.currentPrice,
+            c: roundState.currentPrice,
+        };
+    } else {
+        candleState.h = Math.max(candleState.h, roundState.currentPrice);
+        candleState.l = Math.min(candleState.l, roundState.currentPrice);
+        candleState.c = roundState.currentPrice;
     }
+    
+    const chartData = chart.data.datasets[0].data;
+    const lastCandleData = chartData[chartData.length - 1];
+
+    if (chartData.length > 0 && lastCandleData.x === candleState.t + roundState.startTime) {
+        lastCandleData.h = candleState.h;
+        lastCandleData.l = candleState.l;
+        lastCandleData.c = candleState.c;
+    } else {
+         chartData.push({x: candleState.t + roundState.startTime, o: candleState.o, h: candleState.h, l: candleState.l, c: candleState.c});
+    }
+
+    if(chartData.length > 100) { 
+        chartData.shift();
+    }
+    
+    chart.update('none');
 }
 
 function buy(qty) {
@@ -220,6 +252,7 @@ function handleLiquidation(isEndOfRound) {
       gameState.bankruptCount++;
       gameState.accountBalance = 0;
     }
+    [dom.buyBtn, dom.sellBtn, dom.panicSellBtn].forEach(btn => btn.disabled = true);
     dom.bankruptOverlay.classList.remove('hidden');
     updateAdRescueUI();
     saveGameState();
@@ -232,8 +265,6 @@ function handleAdRescue() {
         logEvent(`Ad Rescue on cooldown for ${Math.ceil(cooldownLeft / 1000)}s`, "error");
         return;
     }
-    // Simple daily limit check
-    // A more robust check would involve checking the date
     if (now - gameState.adRescue.lastUsed > 24 * 60 * 60 * 1000) {
         gameState.adRescue.count = 0;
     }
@@ -309,7 +340,6 @@ function logEvent(message, type = "info") {
     }
 }
 
-// --- UI Update Functions ---
 function updateAllUI() {
     const remaining = Math.max(0, ROUND_DURATION - (Date.now() - roundState.startTime));
     dom.timer.textContent = `${Math.floor(remaining / 60000).toString().padStart(2, '0')}:${Math.floor((remaining % 60000) / 1000).toString().padStart(2, '0')}`;
@@ -321,7 +351,7 @@ function updateAllUI() {
         roundState.unrealizedPnl = roundState.positionSize * (roundState.currentPrice - roundState.entryPrice) * roundState.leverage;
         const margin = (roundState.positionSize * roundState.entryPrice) / roundState.leverage;
         dom.pnlValue.textContent = `$${roundState.unrealizedPnl.toFixed(2)}`;
-        dom.pnlPercent.textContent = `${(roundState.unrealizedPnl / margin * 100).toFixed(2)}%`;
+        dom.pnlPercent.textContent = `${(margin !== 0 ? (roundState.unrealizedPnl / margin * 100) : 0).toFixed(2)}%`;
         dom.pnlValue.style.color = roundState.unrealizedPnl >= 0 ? 'var(--long-color)' : 'var(--short-color)';
         dom.pnlPercent.style.color = dom.pnlValue.style.color;
     } else {
@@ -353,14 +383,12 @@ function updateAdRescueUI() {
     }
 }
 
-// --- Event Listeners ---
 function initEventListeners() {
     dom.copySeedBtn.addEventListener('click', () => {
         navigator.clipboard.writeText(roundState.seed).then(() => {
             logEvent("Round seed copied to clipboard!", "system");
         });
     });
-
     dom.leverageSlider.addEventListener('input', e => {
         if(roundState.positionSize > 0) { e.target.value = roundState.leverage; return; }
         roundState.leverage = Number(e.target.value);
@@ -380,41 +408,34 @@ function initEventListeners() {
     dom.adRescueBtn.addEventListener('click', handleAdRescue);
 }
 
-// Chart.js stubs from previous steps need to be included
 function initChart() {
     const ctx = dom.priceChartCanvas.getContext('2d');
     chart = new Chart(ctx, {
-        type: 'line',
+        type: 'candlestick',
         data: {
-            labels: [],
             datasets: [{
                 label: 'Price',
                 data: [],
-                borderColor: 'rgba(240, 185, 11, 0.8)',
-                borderWidth: 2,
-                fill: false,
-                tension: 0.4,
-                pointRadius: 0,
             }]
         },
         options: {
             responsive: true,
             maintainAspectRatio: false,
-            scales: { x: { display: false }, y: { grid: { color: 'rgba(255,255,255,0.1)' } } },
-            plugins: { legend: { display: false } }
+            scales: {
+                x: {
+                    type: 'time',
+                    time: { unit: 'second' },
+                    grid: { color: 'rgba(255,255,255,0.1)' },
+                },
+                y: { 
+                    grid: { color: 'rgba(255,255,255,0.1)' }
+                }
+            },
+            plugins: {
+                legend: { display: false }
+            }
         }
     });
 }
-function updateChart(time, price) {
-     if (chart.data.labels.length > 600) {
-        chart.data.labels.shift();
-        chart.data.datasets[0].data.shift();
-    }
-    chart.data.labels.push(time);
-    chart.data.datasets[0].data.push(price);
-    chart.update('none');
-}
 
-// --- Start Game ---
 document.addEventListener('DOMContentLoaded', init);
-
