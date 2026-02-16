@@ -1,0 +1,176 @@
+<!doctype html>
+<html lang="ko" data-theme="dark">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>두더지 잡기 게임</title>
+  <link rel="stylesheet" href="../style.css">
+  <style>
+    .game-board {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 10px;
+      width: 300px;
+      margin: 20px auto;
+    }
+    .hole {
+      width: 90px;
+      height: 90px;
+      background-color: #a56a47;
+      border-radius: 50%;
+      border: 5px solid #633d26;
+      position: relative;
+      overflow: hidden;
+    }
+    .mole {
+      width: 60px;
+      height: 60px;
+      background-color: #d2a172;
+      border-radius: 50%;
+      position: absolute;
+      bottom: -100%;
+      left: 50%;
+      transform: translateX(-50%);
+      transition: bottom 0.2s;
+      cursor: pointer;
+      border: 3px solid #633d26;
+    }
+    .mole.up { bottom: 10px; }
+    .difficulty-setting, .game-controls { margin-bottom: 20px; display: flex; gap: 10px; align-items: center; justify-content: center; }
+    .score-board { font-size: 1.2em; font-weight: bold; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <a href="/" class="home-link">← 홈으로 돌아가기</a>
+    <div class="row" style="margin-bottom:14px; align-items: center;">
+      <h1 style="margin:0;">두더지 잡기</h1>
+      <button id="themeToggle" class="btn2" style="margin-left: auto;">테마 변경</button>
+    </div>
+
+    <div class="card" style="text-align:center;">
+      <div class="difficulty-setting">
+        <label>난이도:</label>
+        <button class="btn2" data-difficulty="easy">쉬움</button>
+        <button class="btn2" data-difficulty="normal">보통</button>
+        <button class="btn2" data-difficulty="hard">어려움</button>
+      </div>
+      <div class="game-controls">
+        <button id="startButton">게임 시작</button>
+        <div class="score-board">점수: <span id="score">0</span></div>
+        <div class="score-board">남은 시간: <span id="timeLeft">30</span></div>
+      </div>
+      <div class="game-board">
+        <div class="hole"><div class="mole"></div></div>
+        <div class="hole"><div class="mole"></div></div>
+        <div class="hole"><div class="mole"></div></div>
+        <div class="hole"><div class="mole"></div></div>
+        <div class="hole"><div class="mole"></div></div>
+        <div class="hole"><div class="mole"></div></div>
+        <div class="hole"><div class="mole"></div></div>
+        <div class="hole"><div class="mole"></div></div>
+        <div class="hole"><div class="mole"></div></div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // Theme switcher
+    const themeToggle = document.getElementById('themeToggle');
+    const htmlEl = document.documentElement;
+    const applyTheme = (theme) => { htmlEl.dataset.theme = theme; localStorage.setItem('theme', theme); };
+    themeToggle.addEventListener('click', () => { const currentTheme = htmlEl.dataset.theme === 'dark' ? 'light' : 'dark'; applyTheme(currentTheme); });
+    const savedTheme = localStorage.getItem('theme');
+    const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+    if (savedTheme) { applyTheme(savedTheme); } else { applyTheme(prefersDark ? 'dark' : 'light'); }
+
+    // Game Logic
+    const holes = document.querySelectorAll('.hole');
+    const moles = document.querySelectorAll('.mole');
+    const scoreBoard = document.getElementById('score');
+    const timeLeftBoard = document.getElementById('timeLeft');
+    const startButton = document.getElementById('startButton');
+    const difficultyButtons = document.querySelectorAll('.difficulty-setting button');
+
+    let lastHole;
+    let timeUp = false;
+    let score = 0;
+    let gameTimerId;
+    let moleTimerId;
+    let difficulty = 'normal';
+    const speeds = { easy: 1000, normal: 600, hard: 300 };
+
+    function setDifficulty(newDifficulty) {
+      difficulty = newDifficulty;
+      document.querySelectorAll('.difficulty-setting button.active').forEach(b => b.classList.remove('active'));
+      document.querySelector(`[data-difficulty="${difficulty}"]`).classList.add('active');
+    }
+
+    function randomTime(min, max) {
+      return Math.round(Math.random() * (max - min) + min);
+    }
+
+    function randomHole(holes) {
+      const idx = Math.floor(Math.random() * holes.length);
+      const hole = holes[idx];
+      if (hole === lastHole) {
+        return randomHole(holes);
+      }
+      lastHole = hole;
+      return hole;
+    }
+
+    function peep() {
+      const time = randomTime(speeds[difficulty] / 2, speeds[difficulty]);
+      const hole = randomHole(holes);
+      const mole = hole.querySelector('.mole');
+      mole.classList.add('up');
+      setTimeout(() => {
+        mole.classList.remove('up');
+        if (!timeUp) peep();
+      }, time);
+    }
+
+    function startGame() {
+      scoreBoard.textContent = 0;
+      score = 0;
+      timeUp = false;
+      let timeLeft = 30;
+      timeLeftBoard.textContent = timeLeft;
+      
+      startButton.disabled = true;
+      difficultyButtons.forEach(b => b.disabled = true);
+
+      peep();
+
+      gameTimerId = setInterval(() => {
+        timeLeft--;
+        timeLeftBoard.textContent = timeLeft;
+        if (timeLeft <= 0) {
+          clearInterval(gameTimerId);
+          timeUp = true;
+          alert('게임 종료! 최종 점수: ' + score);
+          startButton.disabled = false;
+          difficultyButtons.forEach(b => b.disabled = false);
+        }
+      }, 1000);
+    }
+
+    function bonk(e) {
+      if (!e.isTrusted) return; // Cheater!
+      score++;
+      this.classList.remove('up');
+      scoreBoard.textContent = score;
+    }
+
+    moles.forEach(mole => mole.addEventListener('click', bonk));
+    startButton.addEventListener('click', startGame);
+    difficultyButtons.forEach(button => {
+      button.addEventListener('click', () => setDifficulty(button.dataset.difficulty));
+    });
+    
+    // Initial setup
+    setDifficulty('normal');
+  </script>
+</body>
+</html>

@@ -1,0 +1,154 @@
+<!doctype html>
+<html lang="ko" data-theme="dark">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>가위바위보 게임</title>
+  <link rel="stylesheet" href="../style.css">
+  <style>
+    .game-area { text-align: center; }
+    .choices button { font-size: 24px; margin: 0 10px; width: 80px; height: 80px; }
+    .result-area { margin-top: 30px; }
+    #playerChoice, #computerChoice { font-weight: bold; font-size: 20px; }
+    #gameResult { font-size: 28px; font-weight: bold; min-height: 40px; margin-top: 10px; }
+    .score { font-size: 16px; opacity: 0.9; }
+    .difficulty-setting { margin-bottom: 20px; display: flex; gap: 10px; align-items: center; justify-content: center; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <a href="/" class="home-link">← 홈으로 돌아가기</a>
+    <div class="row" style="margin-bottom:14px; align-items: center;">
+      <h1 style="margin:0;">가위바위보 게임</h1>
+      <button id="themeToggle" class="btn2" style="margin-left: auto;">테마 변경</button>
+    </div>
+
+    <div class="card game-area">
+      <div class="difficulty-setting">
+        <label>난이도:</label>
+        <button class="btn2" data-difficulty="easy">쉬움</button>
+        <button class="btn2" data-difficulty="normal">보통</button>
+        <button class="btn2" data-difficulty="hard">어려움</button>
+      </div>
+      
+      <p>하나를 선택하세요</p>
+      <div class="choices">
+        <button data-choice="rock">✊</button>
+        <button data-choice="paper">✋</button>
+        <button data-choice="scissors">✌️</button>
+      </div>
+
+      <div class="result-area">
+        <span id="playerChoice"></span> vs <span id="computerChoice"></span>
+        <div id="gameResult"></div>
+        <div class="score">
+          플레이어: <span id="playerScore">0</span> | 
+          컴퓨터: <span id="computerScore">0</span> | 
+          무승부: <span id="tieScore">0</span>
+        </div>
+      </div>
+       <button id="resetButton" class="btn2" style="margin-top: 20px;">점수 리셋</button>
+    </div>
+  </div>
+
+  <script>
+    // Theme switcher
+    const themeToggle = document.getElementById('themeToggle');
+    const htmlEl = document.documentElement;
+    const applyTheme = (theme) => { htmlEl.dataset.theme = theme; localStorage.setItem('theme', theme); };
+    themeToggle.addEventListener('click', () => { const currentTheme = htmlEl.dataset.theme === 'dark' ? 'light' : 'dark'; applyTheme(currentTheme); });
+    const savedTheme = localStorage.getItem('theme');
+    const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+    if (savedTheme) { applyTheme(savedTheme); } else { applyTheme(prefersDark ? 'dark' : 'light'); }
+
+    // Game Logic
+    const CHOICES = ['rock', 'paper', 'scissors'];
+    const EMOJIS = { rock: '✊', paper: '✋', scissors: '✌️' };
+    const WINS_AGAINST = { rock: 'scissors', paper: 'rock', scissors: 'paper' };
+
+    const choiceButtons = document.querySelectorAll('.choices button');
+    const difficultyButtons = document.querySelectorAll('.difficulty-setting button');
+    const resultDiv = document.getElementById('gameResult');
+    const playerChoiceDiv = document.getElementById('playerChoice');
+    const computerChoiceDiv = document.getElementById('computerChoice');
+    const playerScoreSpan = document.getElementById('playerScore');
+    const computerScoreSpan = document.getElementById('computerScore');
+    const tieScoreSpan = document.getElementById('tieScore');
+    const resetButton = document.getElementById('resetButton');
+
+    let difficulty = 'normal';
+    let scores = { player: 0, computer: 0, tie: 0 };
+    let playerLastChoice = null;
+
+    function setDifficulty(newDifficulty) {
+      difficulty = newDifficulty;
+      document.querySelectorAll('.difficulty-setting button.active').forEach(b => b.classList.remove('active'));
+      document.querySelector(`[data-difficulty="${difficulty}"]`).classList.add('active');
+      resetScores();
+    }
+    
+    function resetScores() {
+        scores = { player: 0, computer: 0, tie: 0 };
+        updateScoreboard();
+    }
+
+    function getComputerChoice(playerChoice) {
+      // Hard mode: 75% chance to cheat and win
+      if (difficulty === 'hard' && Math.random() < 0.75) {
+        return Object.keys(WINS_AGAINST).find(key => WINS_AGAINST[key] === playerChoice);
+      }
+      
+      // Normal mode: Bias against player's last move
+      if (difficulty === 'normal' && playerLastChoice && Math.random() < 0.5) {
+        // Choose the winning move against player's last choice
+         return Object.keys(WINS_AGAINST).find(key => WINS_AGAINST[key] === playerLastChoice);
+      }
+
+      // Easy mode: Pure random
+      return CHOICES[Math.floor(Math.random() * CHOICES.length)];
+    }
+
+    function playGame(playerChoice) {
+      const computerChoice = getComputerChoice(playerChoice);
+      playerLastChoice = playerChoice;
+
+      playerChoiceDiv.textContent = EMOJIS[playerChoice];
+      computerChoiceDiv.textContent = EMOJIS[computerChoice];
+
+      if (playerChoice === computerChoice) {
+        scores.tie++;
+        resultDiv.textContent = '무승부!';
+        resultDiv.style.color = '';
+      } else if (WINS_AGAINST[playerChoice] === computerChoice) {
+        scores.player++;
+        resultDiv.textContent = '플레이어 승리!';
+        resultDiv.style.color = 'var(--link-color)';
+      } else {
+        scores.computer++;
+        resultDiv.textContent = '컴퓨터 승리!';
+        resultDiv.style.color = '#dc3545';
+      }
+      updateScoreboard();
+    }
+    
+    function updateScoreboard() {
+      playerScoreSpan.textContent = scores.player;
+      computerScoreSpan.textContent = scores.computer;
+      tieScoreSpan.textContent = scores.tie;
+    }
+
+    choiceButtons.forEach(button => {
+      button.addEventListener('click', () => playGame(button.dataset.choice));
+    });
+
+    difficultyButtons.forEach(button => {
+      button.addEventListener('click', () => setDifficulty(button.dataset.difficulty));
+    });
+    
+    resetButton.addEventListener('click', resetScores);
+
+    // Initial setup
+    setDifficulty('normal');
+  </script>
+</body>
+</html>

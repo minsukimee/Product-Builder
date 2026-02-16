@@ -1,0 +1,215 @@
+<!doctype html>
+<html lang="ko" data-theme="dark">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>기억력 게임</title>
+  <link rel="stylesheet" href="../style.css">
+  <style>
+    .game-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 10px;
+      max-width: 400px;
+      margin: 20px auto;
+    }
+    .card-container {
+      width: 80px;
+      height: 110px;
+      perspective: 1000px;
+    }
+    .memory-card {
+      width: 100%;
+      height: 100%;
+      position: relative;
+      transform-style: preserve-3d;
+      transition: transform 0.6s;
+      cursor: pointer;
+    }
+    .memory-card.flipped {
+      transform: rotateY(180deg);
+    }
+    .front-face, .back-face {
+      position: absolute;
+      width: 100%;
+      height: 100%;
+      backface-visibility: hidden;
+      border-radius: 10px;
+      display: grid;
+      place-items: center;
+      font-size: 40px;
+    }
+    .front-face {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      color: var(--text-color);
+    }
+    .back-face {
+      background: var(--btn-secondary-bg);
+      border: 1px solid var(--btn-secondary-border);
+      transform: rotateY(180deg);
+    }
+     .difficulty-setting, .game-controls { margin-bottom: 20px; display: flex; gap: 10px; align-items: center; justify-content: center; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <a href="/" class="home-link">← 홈으로 돌아가기</a>
+    <div class="row" style="margin-bottom:14px; align-items: center;">
+      <h1 style="margin:0;">기억력 게임</h1>
+      <button id="themeToggle" class="btn2" style="margin-left: auto;">테마 변경</button>
+    </div>
+
+    <div class="card" style="text-align:center;">
+       <div class="difficulty-setting">
+        <label>난이도:</label>
+        <button class="btn2" data-difficulty="easy">쉬움</button>
+        <button class="btn2" data-difficulty="normal">보통</button>
+        <button class="btn2" data-difficulty="hard">어려움</button>
+      </div>
+      <div class="game-controls">
+        <button id="resetButton">게임 리셋</button>
+        <div class="score-board">시도: <span id="attempts">0</span></div>
+      </div>
+      <div class="game-grid" id="gameGrid"></div>
+    </div>
+  </div>
+
+  <script>
+    // Theme switcher
+    const themeToggle = document.getElementById('themeToggle');
+    const htmlEl = document.documentElement;
+    const applyTheme = (theme) => { htmlEl.dataset.theme = theme; localStorage.setItem('theme', theme); };
+    themeToggle.addEventListener('click', () => { const currentTheme = htmlEl.dataset.theme === 'dark' ? 'light' : 'dark'; applyTheme(currentTheme); });
+    const savedTheme = localStorage.getItem('theme');
+    const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+    if (savedTheme) { applyTheme(savedTheme); } else { applyTheme(prefersDark ? 'dark' : 'light'); }
+
+    // Game Logic
+    const gameGrid = document.getElementById('gameGrid');
+    const attemptsSpan = document.getElementById('attempts');
+    const difficultyButtons = document.querySelectorAll('.difficulty-setting button');
+    const resetButton = document.getElementById('resetButton');
+    
+    const EMOJIS = ['🐶','🐱','🐭','🐹','🐰','🦊','🐻','🐼','🐨','🐯'];
+    let difficulty = 'normal';
+    const PAIRS = { easy: 6, normal: 8, hard: 10 };
+
+    let hasFlippedCard = false;
+    let lockBoard = false;
+    let firstCard, secondCard;
+    let attempts = 0;
+    let matchedPairs = 0;
+    let totalPairs = PAIRS[difficulty];
+
+    function createBoard() {
+      gameGrid.innerHTML = '';
+      attempts = 0;
+      matchedPairs = 0;
+      totalPairs = PAIRS[difficulty];
+      attemptsSpan.textContent = attempts;
+      
+      const emojiSubset = EMOJIS.slice(0, totalPairs);
+      const cards = [...emojiSubset, ...emojiSubset];
+      
+      // Adjust grid columns based on difficulty
+      if (difficulty === 'easy') gameGrid.style.gridTemplateColumns = 'repeat(4, 1fr)';
+      else if (difficulty === 'normal') gameGrid.style.gridTemplateColumns = 'repeat(4, 1fr)';
+      else if (difficulty === 'hard') gameGrid.style.gridTemplateColumns = 'repeat(5, 1fr)';
+
+
+      // Fisher-Yates shuffle
+      for (let i = cards.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [cards[i], cards[j]] = [cards[j], cards[i]];
+      }
+
+      cards.forEach(emoji => {
+        const cardContainer = document.createElement('div');
+        cardContainer.classList.add('card-container');
+        
+        const card = document.createElement('div');
+        card.classList.add('memory-card');
+        card.dataset.emoji = emoji;
+
+        card.innerHTML = `
+          <div class="front-face">?</div>
+          <div class="back-face">${emoji}</div>
+        `;
+        
+        cardContainer.appendChild(card);
+        gameGrid.appendChild(cardContainer);
+        card.addEventListener('click', flipCard);
+      });
+    }
+
+    function flipCard() {
+      if (lockBoard) return;
+      if (this === firstCard) return;
+
+      this.classList.add('flipped');
+
+      if (!hasFlippedCard) {
+        hasFlippedCard = true;
+        firstCard = this;
+        return;
+      }
+
+      secondCard = this;
+      attempts++;
+      attemptsSpan.textContent = attempts;
+      
+      checkForMatch();
+    }
+
+    function checkForMatch() {
+      let isMatch = firstCard.dataset.emoji === secondCard.dataset.emoji;
+      isMatch ? disableCards() : unflipCards();
+    }
+
+    function disableCards() {
+      firstCard.removeEventListener('click', flipCard);
+      secondCard.removeEventListener('click', flipCard);
+      
+      matchedPairs++;
+      if(matchedPairs === totalPairs) {
+        setTimeout(() => {
+            alert(`축하합니다! ${attempts}번 만에 모든 카드를 맞췄습니다!`);
+        }, 500);
+      }
+
+      resetBoard();
+    }
+
+    function unflipCards() {
+      lockBoard = true;
+      setTimeout(() => {
+        firstCard.classList.remove('flipped');
+        secondCard.classList.remove('flipped');
+        resetBoard();
+      }, 1000);
+    }
+
+    function resetBoard() {
+      [hasFlippedCard, lockBoard] = [false, false];
+      [firstCard, secondCard] = [null, null];
+    }
+    
+    function setDifficulty(newDifficulty) {
+      difficulty = newDifficulty;
+      document.querySelectorAll('.difficulty-setting button.active').forEach(b => b.classList.remove('active'));
+      document.querySelector(`[data-difficulty="${difficulty}"]`).classList.add('active');
+      createBoard();
+    }
+    
+    difficultyButtons.forEach(button => {
+        button.addEventListener('click', () => setDifficulty(button.dataset.difficulty))
+    });
+
+    resetButton.addEventListener('click', createBoard);
+
+    // Initial setup
+    setDifficulty('normal');
+  </script>
+</body>
+</html>
