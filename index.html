@@ -1,0 +1,141 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>로또 번호 추첨기</title>
+  <style>
+    body { font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; margin: 0; padding: 24px; background: #0b1220; color: #e8eefc; }
+    .wrap { max-width: 520px; margin: 0 auto; }
+    h1 { font-size: 22px; margin: 0 0 14px; }
+    p { opacity: 0.85; margin: 0 0 18px; }
+    .card { background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.12); border-radius: 14px; padding: 18px; }
+    .row { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+    button {
+      appearance: none; border: 0; border-radius: 12px; padding: 12px 14px;
+      background: #3b82f6; color: white; font-weight: 700; cursor: pointer;
+    }
+    button:active { transform: translateY(1px); }
+    .btn2 { background: transparent; border: 1px solid rgba(255,255,255,0.18); }
+    .balls { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 14px; }
+    .ball {
+      width: 52px; height: 52px; border-radius: 999px;
+      display: grid; place-items: center; font-weight: 800; font-size: 18px;
+      background: rgba(255,255,255,0.08);
+      border: 1px solid rgba(255,255,255,0.16);
+    }
+    .meta { margin-top: 12px; font-size: 13px; opacity: 0.75; }
+    input[type="number"]{
+      width: 90px; padding: 10px 12px; border-radius: 12px;
+      border: 1px solid rgba(255,255,255,0.18);
+      background: rgba(0,0,0,0.2); color: #e8eefc;
+      outline: none;
+    }
+    label { font-size: 14px; opacity: 0.9; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <h1>로또 번호 무작위 추첨기</h1>
+    <p>1~45 중 중복 없이 6개를 뽑아 정렬해서 보여줘.</p>
+
+    <div class="card">
+      <div class="row">
+        <button id="drawBtn">추첨하기</button>
+        <button id="copyBtn" class="btn2">복사</button>
+
+        <label style="margin-left:auto; display:flex; gap:8px; align-items:center;">
+          세트 수
+          <input id="setCount" type="number" min="1" max="20" value="1" />
+        </label>
+      </div>
+
+      <div id="resultArea"></div>
+      <div class="meta" id="meta"></div>
+    </div>
+  </div>
+
+  <script>
+    // 1~45에서 6개 뽑기 (중복 X)
+    function drawLotto() {
+      const nums = Array.from({ length: 45 }, (_, i) => i + 1);
+
+      // Fisher–Yates shuffle
+      for (let i = nums.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [nums[i], nums[j]] = [nums[j], nums[i]];
+      }
+
+      return nums.slice(0, 6).sort((a, b) => a - b);
+    }
+
+    function renderSets(sets) {
+      const area = document.getElementById("resultArea");
+      area.innerHTML = "";
+
+      sets.forEach((set, idx) => {
+        const wrapper = document.createElement("div");
+        wrapper.style.marginTop = "14px";
+
+        const title = document.createElement("div");
+        title.style.fontWeight = "700";
+        title.style.opacity = "0.9";
+        title.textContent = sets.length > 1 ? `세트 ${idx + 1}` : "";
+        if (title.textContent) wrapper.appendChild(title);
+
+        const balls = document.createElement("div");
+        balls.className = "balls";
+
+        set.forEach(n => {
+          const b = document.createElement("div");
+          b.className = "ball";
+          b.textContent = n;
+          balls.appendChild(b);
+        });
+
+        wrapper.appendChild(balls);
+        area.appendChild(wrapper);
+      });
+    }
+
+    function getAllText(sets) {
+      return sets.map(s => s.join(", ")).join("\n");
+    }
+
+    let lastSets = [];
+
+    document.getElementById("drawBtn").addEventListener("click", () => {
+      const count = Math.max(1, Math.min(20, Number(document.getElementById("setCount").value || 1)));
+      lastSets = Array.from({ length: count }, drawLotto);
+
+      renderSets(lastSets);
+
+      const now = new Date();
+      document.getElementById("meta").textContent =
+        `생성 시간: ${now.toLocaleString("ko-KR")}`;
+    });
+
+    document.getElementById("copyBtn").addEventListener("click", async () => {
+      if (!lastSets.length) return;
+
+      const text = getAllText(lastSets);
+      try {
+        await navigator.clipboard.writeText(text);
+        document.getElementById("meta").textContent = "클립보드에 복사 완료!";
+      } catch {
+        // 일부 브라우저에서 clipboard 권한 문제가 있으면 fallback
+        const ta = document.createElement("textarea");
+        ta.value = text;
+        document.body.appendChild(ta);
+        ta.select();
+        document.execCommand("copy");
+        document.body.removeChild(ta);
+        document.getElementById("meta").textContent = "복사 완료!";
+      }
+    });
+
+    // 처음 로드시 1번 자동 추첨
+    document.getElementById("drawBtn").click();
+  </script>
+</body>
+</html>
