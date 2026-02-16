@@ -1,60 +1,110 @@
-<!doctype html>
-<html lang="ko" data-theme="dark">
+<!DOCTYPE html>
+<html lang="en">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>미니 게임 & 도구</title>
-  <link rel="stylesheet" href="style.css">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Whale Wars – 5-Minute Leverage Arena</title>
+    <link rel="stylesheet" href="styles.css">
 </head>
 <body>
-  <div class="wrap">
-    <div class="row" style="margin-bottom: 24px;">
-      <h1 style="margin:0;">미니 게임 & 도구</h1>
-      <button id="themeToggle" class="btn2" style="margin-left: auto;">테마 변경</button>
+    <div id="game-container">
+        <div id="top-bar">
+            <div id="timer-container">
+                <span id="timer">05:00</span>
+                <span id="next-round-countdown"></span>
+            </div>
+            <div id="round-info">
+                <span>Round: <span id="round-number">1</span></span>
+                <span>Seed: <span id="round-seed">...</span> <button id="copy-seed-btn">Copy</button></span>
+            </div>
+        </div>
+
+        <main id="main-content">
+            <div id="left-panel">
+                <div id="account-card" class="card">
+                    <h2>Account</h2>
+                    <p>Balance: <span id="account-balance">$10,000</span></p>
+                    <p>Last Round PnL: <span id="last-round-pnl">$0</span></p>
+                    <p>All-time High: <span id="all-time-high">$10,000</span></p>
+                    <p>Bankruptcies: <span id="bankrupt-count">0</span></p>
+                </div>
+
+                <div id="round-state-card" class="card">
+                    <h2>This Round</h2>
+                    <p>Cash: <span id="round-cash">$10,000</span></p>
+                    <p>Position Size: <span id="position-size">0</span></p>
+                    <p>Entry Price: <span id="entry-price">N/A</span></p>
+                    <p>Leveraged PnL: <span id="pnl-value">$0</span> (<span id="pnl-percent">0%</span>)</p>
+                    <p>Margin Used: <span id="margin-used">$0</span></p>
+                    <div id="risk-meter-container">
+                        <span>Risk: </span>
+                        <progress id="risk-meter" value="0" max="100"></progress>
+                    </div>
+                </div>
+
+                <div id="trading-panel" class="card">
+                    <h2>Trade</h2>
+                    <div class="leverage-selector">
+                        <label for="leverage-slider">Leverage: <span id="leverage-display">1x</span></label>
+                        <input type="range" id="leverage-slider" min="1" max="10" value="1" step="1">
+                        <div class="leverage-presets">
+                            <button data-leverage="1">1x</button>
+                            <button data-leverage="2">2x</button>
+                            <button data-leverage="3">3x</button>
+                            <button data-leverage="5">5x</button>
+                            <button data-leverage="10">10x</button>
+                        </div>
+                    </div>
+                    <div class="qty-selector">
+                        <label for="qty-input">Quantity:</label>
+                        <input type="number" id="qty-input" value="1">
+                        <div class="qty-presets">
+                            <button data-qty="1">1</button>
+                            <button data-qty="5">5</button>
+                            <button data-qty="10">10</button>
+                            <button data-qty="25">25</button>
+                            <button id="max-qty-btn">MAX</button>
+                        </div>
+                    </div>
+                    <div class="trade-actions">
+                        <button id="buy-btn" class="btn-long">BUY / LONG</button>
+                        <button id="sell-btn" class="btn-short">SELL / CLOSE</button>
+                        <button id="panic-sell-btn">PANIC SELL</button>
+                    </div>
+                </div>
+            </div>
+
+            <div id="right-panel">
+                <div id="chart-container" class="card">
+                    <div id="price-display">
+                        <span id="current-price">100.00</span>
+                    </div>
+                    <canvas id="price-chart"></canvas>
+                </div>
+                <div id="news-feed-container" class="card">
+                    <h2>Events</h2>
+                    <ul id="news-feed"></ul>
+                </div>
+            </div>
+        </main>
     </div>
 
-    <div class="card">
-      <h2>도구</h2>
-      <ul class="nav-list">
-        <li><a href="lotto.html">로또 번호 추첨기</a></li>
-      </ul>
+    <div id="bankrupt-overlay" class="hidden">
+        <div class="overlay-content">
+            <h1>💀 BANKRUPT</h1>
+            <p>Watch an ad to respawn with $2,000.</p>
+            <div id="ad-rescue-ui">
+                <button id="ad-rescue-btn">▶ Ad Rescue (Get $2,000)</button>
+                <div id="ad-timer" class="hidden">
+                    <p>Watching ad...</p>
+                    <progress id="ad-progress" value="0" max="100"></progress>
+                </div>
+                <p id="ad-cooldown" class="hidden">Available in 60s</p>
+            </div>
+        </div>
     </div>
-
-    <div class="card" style="margin-top: 24px;">
-      <h2>미니 게임</h2>
-      <ul class="nav-list">
-        <li><a href="games/number-guess.html">숫자 맞추기</a></li>
-        <li><a href="games/rock-paper-scissors.html">가위바위보</a></li>
-        <li><a href="games/whac-a-mole.html">두더지 잡기</a></li>
-        <li><a href="games/memory-game.html">기억력 게임</a></li>
-        <li><a href="games/typing-test.html">타자 연습</a></li>
-      </ul>
-    </div>
-  </div>
-
-  <script>
-    // Theme switcher
-    const themeToggle = document.getElementById('themeToggle');
-    const htmlEl = document.documentElement;
-
-    const applyTheme = (theme) => {
-      htmlEl.dataset.theme = theme;
-      localStorage.setItem('theme', theme);
-    };
-
-    themeToggle.addEventListener('click', () => {
-      const currentTheme = htmlEl.dataset.theme === 'dark' ? 'light' : 'dark';
-      applyTheme(currentTheme);
-    });
-
-    // Apply saved theme or system preference on load
-    const savedTheme = localStorage.getItem('theme');
-    const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-    if (savedTheme) {
-      applyTheme(savedTheme);
-    } else {
-      applyTheme(prefersDark ? 'dark' : 'light');
-    }
-  </script>
+    
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="app.js"></script>
 </body>
 </html>
