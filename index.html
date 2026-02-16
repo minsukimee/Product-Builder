@@ -1,34 +1,81 @@
 <!doctype html>
-<html lang="ko">
+<html lang="ko" data-theme="dark">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>로또 번호 추첨기</title>
   <style>
-    body { font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; margin: 0; padding: 24px; background: #0b1220; color: #e8eefc; }
+    :root {
+      --bg-color: #0b1220;
+      --text-color: #e8eefc;
+      --card-bg: rgba(255,255,255,0.06);
+      --card-border: rgba(255,255,255,0.12);
+      --btn-secondary-bg: transparent;
+      --btn-secondary-border: rgba(255,255,255,0.18);
+      --ball-bg: rgba(255,255,255,0.08);
+      --ball-border: rgba(255,255,255,0.16);
+      --input-bg: rgba(0,0,0,0.2);
+      --input-border: rgba(255,255,255,0.18);
+      --input-text-color: #e8eefc;
+    }
+
+    [data-theme="light"] {
+      --bg-color: #f0f2f5;
+      --text-color: #1c1e21;
+      --card-bg: #ffffff;
+      --card-border: #dcdfe3;
+      --btn-secondary-bg: transparent;
+      --btn-secondary-border: #dcdfe3;
+      --ball-bg: #f0f2f5;
+      --ball-border: #dcdfe3;
+      --input-bg: #f0f2f5;
+      --input-border: #dcdfe3;
+      --input-text-color: #1c1e21;
+    }
+
+    body {
+      font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+      margin: 0;
+      padding: 24px;
+      background: var(--bg-color);
+      color: var(--text-color);
+      transition: background 0.2s, color 0.2s;
+    }
     .wrap { max-width: 520px; margin: 0 auto; }
     h1 { font-size: 22px; margin: 0 0 14px; }
     p { opacity: 0.85; margin: 0 0 18px; }
-    .card { background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.12); border-radius: 14px; padding: 18px; }
+    .card {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 14px;
+      padding: 18px;
+      transition: background 0.2s, border 0.2s;
+    }
     .row { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
     button {
       appearance: none; border: 0; border-radius: 12px; padding: 12px 14px;
       background: #3b82f6; color: white; font-weight: 700; cursor: pointer;
     }
     button:active { transform: translateY(1px); }
-    .btn2 { background: transparent; border: 1px solid rgba(255,255,255,0.18); }
+    .btn2 {
+      background: var(--btn-secondary-bg);
+      border: 1px solid var(--btn-secondary-border);
+      color: var(--text-color);
+    }
     .balls { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 14px; }
     .ball {
       width: 52px; height: 52px; border-radius: 999px;
       display: grid; place-items: center; font-weight: 800; font-size: 18px;
-      background: rgba(255,255,255,0.08);
-      border: 1px solid rgba(255,255,255,0.16);
+      background: var(--ball-bg);
+      border: 1px solid var(--ball-border);
+      transition: background 0.2s, border 0.2s;
     }
     .meta { margin-top: 12px; font-size: 13px; opacity: 0.75; }
     input[type="number"]{
       width: 90px; padding: 10px 12px; border-radius: 12px;
-      border: 1px solid rgba(255,255,255,0.18);
-      background: rgba(0,0,0,0.2); color: #e8eefc;
+      border: 1px solid var(--input-border);
+      background: var(--input-bg);
+      color: var(--input-text-color);
       outline: none;
     }
     label { font-size: 14px; opacity: 0.9; }
@@ -36,7 +83,10 @@
 </head>
 <body>
   <div class="wrap">
-    <h1>로또 번호 무작위 추첨기</h1>
+    <div class="row" style="margin-bottom:14px;">
+      <h1 style="margin:0;">로또 번호 무작위 추첨기</h1>
+      <button id="themeToggle" class="btn2" style="margin-left: auto;">테마 변경</button>
+    </div>
     <p>1~45 중 중복 없이 6개를 뽑아 정렬해서 보여줘.</p>
 
     <div class="card">
@@ -56,43 +106,58 @@
   </div>
 
   <script>
-    // 1~45에서 6개 뽑기 (중복 X)
+    // Theme switcher
+    const themeToggle = document.getElementById('themeToggle');
+    const htmlEl = document.documentElement;
+
+    const applyTheme = (theme) => {
+      htmlEl.dataset.theme = theme;
+      localStorage.setItem('theme', theme);
+    };
+
+    themeToggle.addEventListener('click', () => {
+      const currentTheme = htmlEl.dataset.theme === 'dark' ? 'light' : 'dark';
+      applyTheme(currentTheme);
+    });
+
+    // Apply saved theme or system preference on load
+    const savedTheme = localStorage.getItem('theme');
+    const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+    if (savedTheme) {
+      applyTheme(savedTheme);
+    } else {
+      applyTheme(prefersDark ? 'dark' : 'light');
+    }
+
+    // Lotto logic
     function drawLotto() {
       const nums = Array.from({ length: 45 }, (_, i) => i + 1);
-
-      // Fisher–Yates shuffle
       for (let i = nums.length - 1; i > 0; i--) {
         const j = Math.floor(Math.random() * (i + 1));
         [nums[i], nums[j]] = [nums[j], nums[i]];
       }
-
       return nums.slice(0, 6).sort((a, b) => a - b);
     }
 
     function renderSets(sets) {
       const area = document.getElementById("resultArea");
       area.innerHTML = "";
-
       sets.forEach((set, idx) => {
         const wrapper = document.createElement("div");
         wrapper.style.marginTop = "14px";
-
         const title = document.createElement("div");
         title.style.fontWeight = "700";
         title.style.opacity = "0.9";
         title.textContent = sets.length > 1 ? `세트 ${idx + 1}` : "";
         if (title.textContent) wrapper.appendChild(title);
-
         const balls = document.createElement("div");
         balls.className = "balls";
-
         set.forEach(n => {
           const b = document.createElement("div");
           b.className = "ball";
           b.textContent = n;
           balls.appendChild(b);
         });
-
         wrapper.appendChild(balls);
         area.appendChild(wrapper);
       });
@@ -107,23 +172,18 @@
     document.getElementById("drawBtn").addEventListener("click", () => {
       const count = Math.max(1, Math.min(20, Number(document.getElementById("setCount").value || 1)));
       lastSets = Array.from({ length: count }, drawLotto);
-
       renderSets(lastSets);
-
       const now = new Date();
-      document.getElementById("meta").textContent =
-        `생성 시간: ${now.toLocaleString("ko-KR")}`;
+      document.getElementById("meta").textContent = `생성 시간: ${now.toLocaleString("ko-KR")}`;
     });
 
     document.getElementById("copyBtn").addEventListener("click", async () => {
       if (!lastSets.length) return;
-
       const text = getAllText(lastSets);
       try {
         await navigator.clipboard.writeText(text);
         document.getElementById("meta").textContent = "클립보드에 복사 완료!";
       } catch {
-        // 일부 브라우저에서 clipboard 권한 문제가 있으면 fallback
         const ta = document.createElement("textarea");
         ta.value = text;
         document.body.appendChild(ta);
@@ -134,7 +194,6 @@
       }
     });
 
-    // 처음 로드시 1번 자동 추첨
     document.getElementById("drawBtn").click();
   </script>
 </body>
